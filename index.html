@@ -208,7 +208,58 @@ body {
 <button onclick="logout()" class="btn-logout">🚪 Sair</button>
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
+  const firebaseConfig = {
+  apiKey: "AIzaSyAcglBjm9DYGKFSp5hYk71HX3paNYrXtsE",
+  authDomain: "idle-miner-game.firebaseapp.com",
+  projectId: "idle-miner-game",
+  storageBucket: "idle-miner-game.firebasestorage.app",
+  messagingSenderId: "569609751940",
+  appId: "1:569609751940:web:01a7b7b6208e185f56e1d1"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
+
+
+<script>
+
+let currentUserId = null;
+
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUserId = user.uid;
+    await loadPlayerFromBackend();
+  } else {
+    auth.signInAnonymously();
+  }
+});
+
+async function loadPlayerFromBackend() {
+  const ref = db.collection("players").doc(currentUserId);
+  const doc = await ref.get();
+
+  if (doc.exists) {
+    player = doc.data();
+    multiplier = 1 + (player.upgrades.training * 0.05);
+  } else {
+    // jogador novo
+    player.username = "";
+    await ref.set(player);
+  }
+
+  updateUI();
+  updateWallet();
+}
+
 /* =====================
    CONFIGURAÇÕES GERAIS
 ===================== */
@@ -266,9 +317,11 @@ window.onload = () => {
    SAVE
 ===================== */
 function saveGame() {
+  if (!currentUserId) return;
   player.lastActive = Date.now();
-  localStorage.setItem("idlePlayer", JSON.stringify(player));
+  db.collection("players").doc(currentUserId).set(player);
 }
+
 
 /* =====================
    LOGIN
@@ -276,11 +329,12 @@ function saveGame() {
 function login() {
   const name = document.getElementById("username").value.trim();
   if (!name) return alert("Digite um nome");
-  applyOfflineMining()
+
   player.username = name;
   saveGame();
   enterGame();
 }
+
 
 function autoLogin() {
   if (!player.username) return;
@@ -477,3 +531,4 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
