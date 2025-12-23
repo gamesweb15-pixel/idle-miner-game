@@ -335,6 +335,7 @@ function autoLogin() {
 }
 
 function enterGame() {
+  if (!player.username) return;
   applyOfflineMining(); // ✅ agora é seguro
 
   document.getElementById("walletBox").classList.remove("hidden");
@@ -527,6 +528,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
