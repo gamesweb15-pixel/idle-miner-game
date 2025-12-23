@@ -173,11 +173,11 @@ body {
 <h4>🛒 Loja</h4>
 
 <button class="btn-upgrade" onclick="buyUpgrade('pickaxe')">
-  ⛏️ Picareta (+0.01) <span id="pickaxeInfo"></span>
+  ⛏️ Picareta (+0.005) <span id="pickaxeInfo"></span>
 </button>
 
 <button class="btn-upgrade" onclick="buyUpgrade('training')">
-  📚 Treinamento (+10%) <span id="trainingInfo"></span>
+  📚 Treinamento (+5%) <span id="trainingInfo"></span>
 </button>
 
 <button class="btn-upgrade" onclick="buyUpgrade('booster')">
@@ -187,14 +187,11 @@ body {
 </div>
 
 <script>
-
-let boostRemaining = 0;
-let boostInterval = null;
-
 /* =====================
-   CONFIGURAÇÕES
+   CONFIGURAÇÕES GERAIS
 ===================== */
 const OFFLINE_LIMIT_HOURS = 8;
+const COINS_PER_REAL = 100000;
 let BOOSTER_DURATION = 30;
 const AD_COOLDOWN = 300;
 
@@ -217,6 +214,8 @@ let player = {
 
 let multiplier = 1;
 let boosterActive = false;
+let boostRemaining = 0;
+let boostInterval = null;
 
 /* =====================
    LOAD
@@ -228,13 +227,15 @@ window.onload = () => {
 
     player.coins ??= 0;
     player.rate ??= 0.025;
+    player.wallet ??= 0;
     player.lastActive ??= Date.now();
     player.lastAdTime ??= 0;
     player.upgrades ??= { pickaxe:0, training:0, booster:0 };
-    player.wallet ??= 0;
+
+    // Recalcula multiplicador com base no treinamento
+    multiplier = 1 + (player.upgrades.training * 0.05);
 
     applyOfflineMining();
-    
     autoLogin();
   }
 };
@@ -253,19 +254,15 @@ function saveGame() {
 function login() {
   const name = document.getElementById("username").value.trim();
   if (!name) return alert("Digite um nome");
-  applyOfflineMining();
+
   player.username = name;
   saveGame();
   enterGame();
-  updateWallet();
-
 }
 
 function autoLogin() {
   if (!player.username) return;
   enterGame();
-  updateWallet();
-
 }
 
 function enterGame() {
@@ -274,46 +271,39 @@ function enterGame() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("gameBox").classList.remove("hidden");
   startMiningAnimation();
-  updateWallet();
   updateUI();
-  
-
+  updateWallet();
 }
 
 /* =====================
-   OFFLINE
+   OFFLINE MINING
 ===================== */
 function applyOfflineMining() {
   const now = Date.now();
   let offlineSeconds = Math.floor((now - player.lastActive) / 1000);
 
-  const MAX_OFFLINE = 8 * 60 * 60; // 8 horas
-
+  const MAX_OFFLINE = OFFLINE_LIMIT_HOURS * 60 * 60;
   if (offlineSeconds <= 0) return;
 
   if (offlineSeconds > MAX_OFFLINE) {
     offlineSeconds = MAX_OFFLINE;
   }
 
-  const earned = offlineSeconds * player.rate;
-
+  const earned = offlineSeconds * player.rate * multiplier;
   player.coins += earned;
   player.lastActive = now;
 
   saveGame();
-  
-
 
   alert(`⛏️ Você minerou ${earned.toFixed(3)} coins offline (${Math.floor(offlineSeconds/60)} min)`);
 }
 
 /* =====================
-   ONLINE
+   ONLINE MINING
 ===================== */
 setInterval(() => {
   if (!player.username) return;
   player.coins += player.rate * multiplier;
-  player.lastActive = Date.now();
   saveGame();
   updateUI();
 }, 1000);
@@ -323,7 +313,7 @@ setInterval(() => {
 ===================== */
 function watchAd() {
   const now = Date.now();
-  const elapsed = Math.floor((now - (player.lastAdTime || 0)) / 1000);
+  const elapsed = Math.floor((now - player.lastAdTime) / 1000);
 
   if (elapsed < AD_COOLDOWN) {
     alert(`Aguarde ${AD_COOLDOWN - elapsed}s para novo anúncio`);
@@ -333,60 +323,56 @@ function watchAd() {
   if (boosterActive) return;
 
   boosterActive = true;
-  multiplier = 2;
+  multiplier *= 2;
   boostRemaining = BOOSTER_DURATION;
   player.lastAdTime = now;
-  saveGame();
 
-  document.getElementById("character")?.classList.add("booster");
+  document.getElementById("character").classList.add("booster");
   document.getElementById("boostTimer").classList.remove("hidden");
   document.getElementById("boostTime").innerText = boostRemaining;
-
-  if (boostInterval) clearInterval(boostInterval);
 
   boostInterval = setInterval(() => {
     boostRemaining--;
     document.getElementById("boostTime").innerText = boostRemaining;
 
-    if (boostRemaining <= 0) {
-      clearInterval(boostInterval);
-      endBooster();
-    }
+    if (boostRemaining <= 0) endBooster();
   }, 1000);
+
+  saveGame();
 }
 
 function endBooster() {
   boosterActive = false;
-  multiplier = 1;
-  boostRemaining = 0;
+  multiplier /= 2;
+  clearInterval(boostInterval);
 
-  document.getElementById("character")?.classList.remove("booster");
+  document.getElementById("character").classList.remove("booster");
   document.getElementById("boostTimer").classList.add("hidden");
 
   saveGame();
 }
 
 /* =====================
-   LOJA
+   LOJA (ECONOMIA NOVA)
 ===================== */
 const shop = {
   pickaxe: {
-    baseCost: 1,
-    scaling: 1.6,
+    baseCost: 50,
+    scaling: 1.75,
     effect() {
-      player.rate += 0.01;
+      player.rate += 0.005;
     }
   },
   training: {
-    baseCost: 5,
+    baseCost: 200,
     scaling: 2,
     effect() {
-      multiplier += 0.1;
+      multiplier += 0.05;
     }
   },
   booster: {
-    baseCost: 10,
-    scaling: 2.5,
+    baseCost: 250,
+    scaling: 2.2,
     effect() {
       BOOSTER_DURATION += 5;
     }
@@ -400,14 +386,12 @@ function getUpgradeCost(key) {
 
 function buyUpgrade(key) {
   const cost = getUpgradeCost(key);
-  if (player.coins < cost) {
-    alert("Moedas insuficientes");
-    return;
-  }
+  if (player.coins < cost) return alert("Moedas insuficientes");
 
   player.coins -= cost;
   player.upgrades[key]++;
   shop[key].effect();
+
   saveGame();
   updateUI();
 }
@@ -416,82 +400,58 @@ function buyUpgrade(key) {
    UI
 ===================== */
 function updateUI() {
-  document.getElementById("coins").innerText =
-    player.coins.toFixed(3);
-
-  document.getElementById("rate").innerText =
-    (player.rate * multiplier).toFixed(3);
+  document.getElementById("coins").innerText = player.coins.toFixed(3);
+  document.getElementById("rate").innerText = (player.rate * multiplier).toFixed(3);
 
   document.getElementById("pickaxeInfo").innerText =
-    `(Lvl ${player.upgrades.pickaxe} | ${getUpgradeCost("pickaxe").toFixed(2)})`;
+    `(Lvl ${player.upgrades.pickaxe} | ${getUpgradeCost("pickaxe").toFixed(1)})`;
 
   document.getElementById("trainingInfo").innerText =
-    `(Lvl ${player.upgrades.training} | ${getUpgradeCost("training").toFixed(2)})`;
+    `(Lvl ${player.upgrades.training} | ${getUpgradeCost("training").toFixed(1)})`;
 
   document.getElementById("boosterInfo").innerText =
-    `(Lvl ${player.upgrades.booster} | ${getUpgradeCost("booster").toFixed(2)})`;
-}
-function startMiningAnimation() {
-  const char = document.getElementById("character");
-  char.classList.add("mining");
-}
-
-function stopMiningAnimation() {
-  const char = document.getElementById("character");
-  char.classList.remove("mining", "booster");
-}
-
-function logout() {
-  player.lastActive = Date.now();
-  saveGame();
-
-  stopMiningAnimation();
-  endBooster();
-
-  document.getElementById("gameBox").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
-  document.getElementById("walletBox").classList.add("hidden");
-
-
-  player.username = "";
-}
-
-function collectCoins() {
-  if (player.coins <= 0) {
-    alert("Nada para coletar");
-    return;
-  }
-
-  player.wallet += player.coins;
-  player.coins = 0;
-
-  saveGame();
-  updateUI();
-  updateWallet();
-
-  alert("✅ Coins transferidas para a carteira");
-}
-
-function withdraw() {
-  const MIN_WITHDRAW = 10; // você controla isso
-
-  if (player.wallet < MIN_WITHDRAW) {
-    alert(`Saque mínimo: ${MIN_WITHDRAW} coins`);
-    return;
-  }
-
-  alert("🚧 Saque será habilitado quando o backend estiver pronto");
+    `(Lvl ${player.upgrades.booster} | ${getUpgradeCost("booster").toFixed(1)})`;
 }
 
 function updateWallet() {
-  document.getElementById("walletBalance").innerText =
-    player.wallet.toFixed(3);
+  document.getElementById("walletBalance").innerText = player.wallet.toFixed(3);
 }
 
+/* =====================
+   AÇÕES
+===================== */
+function collectCoins() {
+  if (player.coins <= 0) return alert("Nada para coletar");
+  player.wallet += player.coins;
+  player.coins = 0;
+  saveGame();
+  updateUI();
+  updateWallet();
+}
 
+function withdraw() {
+  const MIN_WITHDRAW = 100000;
+  if (player.wallet < MIN_WITHDRAW)
+    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+
+  alert("🚧 Saque real será ativado com backend");
+}
+
+function logout() {
+  saveGame();
+  document.getElementById("gameBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("walletBox").classList.add("hidden");
+  player.username = "";
+}
+
+function startMiningAnimation() {
+  document.getElementById("character").classList.add("mining");
+}
 </script>
 
 
 
 </body>
 </html>
+
