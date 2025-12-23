@@ -320,7 +320,7 @@ function saveGame() {
 function login() {
   const name = document.getElementById("username").value.trim();
   if (!name) return alert("Digite um nome");
-  
+  applyOfflineMining();
   player.username = name;
   saveGame();
   enterGame();
@@ -521,6 +521,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
