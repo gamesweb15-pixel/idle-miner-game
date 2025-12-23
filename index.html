@@ -156,6 +156,7 @@ body {
   💼 Carteira  
   <div>Saldo: <span id="walletBalance">0.000</span> coins</div>
   <button onclick="withdraw()">💸 Sacar</button>
+  <button onclick="openPixModal()">🏦 Cadastrar Pix</button>
 </div>
 
 
@@ -207,6 +208,23 @@ body {
 </button>
 <button onclick="logout()" class="btn-logout">🚪 Sair</button>
 </div>
+  
+<div id="pixModal" class="box hidden">
+  <h3>💠 Chave Pix</h3>
+
+  <select id="pixType">
+    <option value="cpf">CPF</option>
+    <option value="email">Email</option>
+    <option value="telefone">Telefone</option>
+    <option value="aleatoria">Chave Aleatória</option>
+  </select>
+
+  <input id="pixKey" placeholder="Digite sua chave Pix" />
+
+  <button class="btn-primary" onclick="savePix()">Salvar</button>
+  <button onclick="closePixModal()">Cancelar</button>
+</div>
+
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -231,6 +249,35 @@ body {
 
 
 <script>
+
+function openPixModal() {
+  document.getElementById("pixModal").classList.remove("hidden");
+
+  if (player.pixKey) {
+    document.getElementById("pixKey").value = player.pixKey;
+    document.getElementById("pixType").value = player.pixType || "cpf";
+  }
+}
+
+function closePixModal() {
+  document.getElementById("pixModal").classList.add("hidden");
+}
+
+async function savePix() {
+  const key = document.getElementById("pixKey").value.trim();
+  const type = document.getElementById("pixType").value;
+
+  if (!key) return alert("Digite sua chave Pix");
+
+  player.pixKey = key;
+  player.pixType = type;
+
+  await saveGame();
+
+  closePixModal();
+  alert("✅ Chave Pix salva com sucesso");
+}
+
 
 let currentUserId = null;
 
@@ -503,13 +550,40 @@ function collectCoins() {
   updateWallet();
 }
 
-function withdraw() {
-  const MIN_WITHDRAW = 100000;
-  if (player.wallet < MIN_WITHDRAW)
-    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+async function withdraw() {
+  if (!player.pixKey) {
+    alert("Cadastre sua chave Pix antes de sacar");
+    openPixModal();
+    return;
+  }
 
-  alert("🚧 Saque real será ativado com backend");
+  const MIN_WITHDRAW = 100000;
+
+  if (player.wallet < MIN_WITHDRAW) {
+    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+  }
+
+  const amountCoins = Math.floor(player.wallet);
+  const amountBRL = (amountCoins / COINS_PER_REAL).toFixed(2);
+
+  await db.collection("withdraw_requests").add({
+    userId: currentUserId,
+    username: player.username,
+    pixKey: player.pixKey,
+    pixType: player.pixType,
+    amountCoins,
+    amountBRL: Number(amountBRL),
+    status: "pending",
+    createdAt: Date.now()
+  });
+
+  player.wallet -= amountCoins;
+  saveGame();
+  updateWallet();
+
+  alert("✅ Saque solicitado! Aguarde pagamento.");
 }
+
 
 function logout() {
   saveGame();
@@ -528,6 +602,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
