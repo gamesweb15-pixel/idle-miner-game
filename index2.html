@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Idle Miner</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f1220;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: url("assets/bg.png") no-repeat center center fixed;
+  background-size: cover;
+  min-height: 100vh;
+}
+  .boost-timer {
+  margin-top: 10px;
+  font-weight: bold;
+  color: gold;
+  text-shadow: 0 0 5px #000;
+}
+
+  .hidden { display: none; }
+
+  .box {
+    background: #1b1f3b;
+    padding: 20px;
+    border-radius: 12px;
+    width: 320px;
+    text-align: center;
+  }
+
+  .character {
+    
+    width: 120px;
+    height: 120px;
+    background: #2ec1cc;
+    border-radius: 50%;
+    margin: 20px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    
+}
+@keyframes mine {
+  0%   { transform: rotate(0deg); }
+  25%  { transform: rotate(-10deg); }
+  50%  { transform: rotate(0deg); }
+  75%  { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.mining {
+  animation: mine 1s infinite;
+}
+
+.booster {
+  box-shadow: 0 0 20px 5px gold;
+  animation: mine 0.5s infinite;
+}
+
+  
+
+  button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .btn-primary { background: #3498db; color: #fff; }
+  .btn-upgrade { background: #9b59b6; color: #fff; }
+  .btn-ad { background: #f1c40f; color: #000; }
+
+  .small {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+  .btn-logout {
+  margin-top: 15px;
+  background: #444;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  background: #666;
+}
+
+#walletBox {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 2;
+  box-shadow: 0 0 10px #000;
+}
+
+#walletBox button {
+  margin-top: 6px;
+  width: 100%;
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#walletBox.hidden {
+  display: none;
+}
+
+.coin-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.coin-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  animation: coinFloat 1.5s infinite ease-in-out;
+}
+
+@keyframes coinFloat {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+
+</style>
+</head>
+
+<body>
+<div id="walletBox" class="hidden">
+  💼 Carteira  
+  <div>Saldo: <span id="walletBalance">0.000</span> coins</div>
+  <button onclick="withdraw()">💸 Sacar</button>
+</div>
+
+
+<!-- LOGIN -->
+<div id="loginBox" class="box">
+  <h2>Login</h2>
+  <input id="username" placeholder="Seu nome" />
+  <button class="btn-primary" onclick="login()">Entrar</button>
+</div>
+
+
+<!-- GAME -->
+<div id="gameBox" class="box hidden">
+  <h3 id="playerName"></h3>
+  
+
+
+  <div id="character" class="character">⛏️</div>
+
+
+  <div class="coin-display">
+  <img src="assets/coin.png" class="coin-icon">
+  <h2 id="coins">0.000</h2>
+  </div>
+  <div class="small">
+    <span id="rate">0.025</span> coins / segundo
+  </div>
+  <button onclick="collectCoins()">📥 Coletar</button>
+  <button class="btn-ad" onclick="watchAd()">🎥 Assistir anúncio (2x)</button>
+  
+  <hr>
+  <div id="boostTimer" class="boost-timer hidden">
+  ⚡ Boost ativo: <span id="boostTime">30</span>s
+  </div>
+
+<h4>🛒 Loja</h4>
+
+<button class="btn-upgrade" onclick="buyUpgrade('pickaxe')">
+  ⛏️ Picareta (+0.005) <span id="pickaxeInfo"></span>
+</button>
+
+<button class="btn-upgrade" onclick="buyUpgrade('training')">
+  📚 Treinamento (+5%) <span id="trainingInfo"></span>
+</button>
+
+<button class="btn-upgrade" onclick="buyUpgrade('booster')">
+  ⚡ Booster Premium (+5s) <span id="boosterInfo"></span>
+</button>
+<button onclick="logout()" class="btn-logout">🚪 Sair</button>
+</div>
+
+<script>
+/* =====================
+   CONFIGURAÇÕES GERAIS
+===================== */
+const OFFLINE_LIMIT_HOURS = 8;
+const COINS_PER_REAL = 100000;
+let BOOSTER_DURATION = 30;
+const AD_COOLDOWN = 300;
+
+/* =====================
+   ESTADO DO JOGO
+===================== */
+let player = {
+  wallet: 0,
+  username: "",
+  coins: 0,
+  rate: 0.025,
+  lastActive: Date.now(),
+  lastAdTime: 0,
+  upgrades: {
+    pickaxe: 0,
+    training: 0,
+    booster: 0
+  }
+};
+
+let multiplier = 1;
+let boosterActive = false;
+let boostRemaining = 0;
+let boostInterval = null;
+
+/* =====================
+   LOAD
+===================== */
+window.onload = () => {
+  const saved = localStorage.getItem("idlePlayer");
+  if (saved) {
+    player = JSON.parse(saved);
+
+    player.coins ??= 0;
+    player.rate ??= 0.025;
+    player.wallet ??= 0;
+    player.lastActive ??= Date.now();
+    player.lastAdTime ??= 0;
+    player.upgrades ??= { pickaxe:0, training:0, booster:0 };
+
+    // Recalcula multiplicador com base no treinamento
+    multiplier = 1 + (player.upgrades.training * 0.05);
+
+    applyOfflineMining();
+    autoLogin();
+  }
+};
+
+/* =====================
+   SAVE
+===================== */
+function saveGame() {
+  player.lastActive = Date.now();
+  localStorage.setItem("idlePlayer", JSON.stringify(player));
+}
+
+/* =====================
+   LOGIN
+===================== */
+function login() {
+  const name = document.getElementById("username").value.trim();
+  if (!name) return alert("Digite um nome");
+  applyOfflineMining()
+  player.username = name;
+  saveGame();
+  enterGame();
+}
+
+function autoLogin() {
+  if (!player.username) return;
+  enterGame();
+}
+
+function enterGame() {
+  document.getElementById("walletBox").classList.remove("hidden");
+  document.getElementById("playerName").innerText = player.username;
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("gameBox").classList.remove("hidden");
+  startMiningAnimation();
+  updateUI();
+  updateWallet();
+}
+
+/* =====================
+   OFFLINE MINING
+===================== */
+function applyOfflineMining() {
+  const now = Date.now();
+  let offlineSeconds = Math.floor((now - player.lastActive) / 1000);
+
+  const MAX_OFFLINE = OFFLINE_LIMIT_HOURS * 60 * 60;
+  if (offlineSeconds <= 0) return;
+
+  if (offlineSeconds > MAX_OFFLINE) {
+    offlineSeconds = MAX_OFFLINE;
+  }
+
+  const earned = offlineSeconds * player.rate * multiplier;
+  player.coins += earned;
+  player.lastActive = now;
+
+  saveGame();
+
+  alert(`⛏️ Você minerou ${earned.toFixed(3)} coins offline (${Math.floor(offlineSeconds/60)} min)`);
+}
+
+/* =====================
+   ONLINE MINING
+===================== */
+setInterval(() => {
+  if (!player.username) return;
+  player.coins += player.rate * multiplier;
+  saveGame();
+  updateUI();
+}, 1000);
+
+/* =====================
+   BOOSTER
+===================== */
+function watchAd() {
+  const now = Date.now();
+  const elapsed = Math.floor((now - player.lastAdTime) / 1000);
+
+  if (elapsed < AD_COOLDOWN) {
+    alert(`Aguarde ${AD_COOLDOWN - elapsed}s para novo anúncio`);
+    return;
+  }
+
+  if (boosterActive) return;
+
+  boosterActive = true;
+  multiplier *= 2;
+  boostRemaining = BOOSTER_DURATION;
+  player.lastAdTime = now;
+
+  document.getElementById("character").classList.add("booster");
+  document.getElementById("boostTimer").classList.remove("hidden");
+  document.getElementById("boostTime").innerText = boostRemaining;
+
+  boostInterval = setInterval(() => {
+    boostRemaining--;
+    document.getElementById("boostTime").innerText = boostRemaining;
+
+    if (boostRemaining <= 0) endBooster();
+  }, 1000);
+
+  saveGame();
+}
+
+function endBooster() {
+  boosterActive = false;
+  multiplier /= 2;
+  clearInterval(boostInterval);
+
+  document.getElementById("character").classList.remove("booster");
+  document.getElementById("boostTimer").classList.add("hidden");
+
+  saveGame();
+}
+
+/* =====================
+   LOJA (ECONOMIA NOVA)
+===================== */
+const shop = {
+  pickaxe: {
+    baseCost: 50,
+    scaling: 1.75,
+    effect() {
+      player.rate += 0.005;
+    }
+  },
+  training: {
+    baseCost: 200,
+    scaling: 2,
+    effect() {
+      multiplier += 0.05;
+    }
+  },
+  booster: {
+    baseCost: 250,
+    scaling: 2.2,
+    effect() {
+      BOOSTER_DURATION += 5;
+    }
+  }
+};
+
+function getUpgradeCost(key) {
+  const level = player.upgrades[key];
+  return shop[key].baseCost * Math.pow(shop[key].scaling, level);
+}
+
+function buyUpgrade(key) {
+  const cost = getUpgradeCost(key);
+  if (player.coins < cost) return alert("Moedas insuficientes");
+
+  player.coins -= cost;
+  player.upgrades[key]++;
+  shop[key].effect();
+
+  saveGame();
+  updateUI();
+}
+
+/* =====================
+   UI
+===================== */
+function updateUI() {
+  document.getElementById("coins").innerText = player.coins.toFixed(3);
+  document.getElementById("rate").innerText = (player.rate * multiplier).toFixed(3);
+
+  document.getElementById("pickaxeInfo").innerText =
+    `(Lvl ${player.upgrades.pickaxe} | ${getUpgradeCost("pickaxe").toFixed(1)})`;
+
+  document.getElementById("trainingInfo").innerText =
+    `(Lvl ${player.upgrades.training} | ${getUpgradeCost("training").toFixed(1)})`;
+
+  document.getElementById("boosterInfo").innerText =
+    `(Lvl ${player.upgrades.booster} | ${getUpgradeCost("booster").toFixed(1)})`;
+}
+
+function updateWallet() {
+  document.getElementById("walletBalance").innerText = player.wallet.toFixed(3);
+}
+
+/* =====================
+   AÇÕES
+===================== */
+function collectCoins() {
+  if (player.coins <= 0) return alert("Nada para coletar");
+  player.wallet += player.coins;
+  player.coins = 0;
+  saveGame();
+  updateUI();
+  updateWallet();
+}
+
+function withdraw() {
+  const MIN_WITHDRAW = 100000;
+  if (player.wallet < MIN_WITHDRAW)
+    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+
+  alert("🚧 Saque real será ativado com backend");
+}
+
+function logout() {
+  saveGame();
+  document.getElementById("gameBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("walletBox").classList.add("hidden");
+  player.username = "";
+}
+
+function startMiningAnimation() {
+  document.getElementById("character").classList.add("mining");
+}
+</script>
+
+
+
+
+</body>
+</html>
