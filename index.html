@@ -163,9 +163,13 @@ body {
 <!-- LOGIN -->
 <div id="loginBox" class="box">
   <h2>Login</h2>
-  <input id="username" placeholder="Seu nome" />
+
+  <input id="username" placeholder="Usuário" />
+  <input id="password" type="password" placeholder="Senha" />
+
   <button class="btn-primary" onclick="login()">Entrar</button>
 </div>
+
 
 
 <!-- GAME -->
@@ -326,14 +330,66 @@ function saveGame() {
 /* =====================
    LOGIN
 ===================== */
-function login() {
-  const name = document.getElementById("username").value.trim();
-  if (!name) return alert("Digite um nome");
+async function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
 
-  player.username = name;
-  saveGame();
+  if (!username || !password) {
+    alert("Preencha usuário e senha");
+    return;
+  }
+
+  const email = `${username}@idleminer.com`;
+
+  try {
+    // tenta logar
+    const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+    onLoginSuccess(cred.user);
+  } catch (err) {
+    if (err.code === "auth/user-not-found") {
+      // cria conta
+      const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+      await createPlayer(cred.user.uid, username);
+      onLoginSuccess(cred.user);
+    } else if (err.code === "auth/wrong-password") {
+      alert("Senha incorreta");
+    } else {
+      alert("Erro: " + err.message);
+    }
+  }
+}
+
+async function createPlayer(uid, username) {
+  await db.collection("players").doc(uid).set({
+    username: username,
+    coins: 0,
+    wallet: 0,
+    rate: 0.025,
+    upgrades: {
+      pickaxe: 0,
+      training: 0,
+      booster: 0
+    },
+    createdAt: Date.now()
+  });
+}
+
+async function onLoginSuccess(user) {
+  currentUserId = user.uid;
+
+  const ref = db.collection("players").doc(currentUserId);
+  const doc = await ref.get();
+
+  if (!doc.exists) {
+    alert("Conta não encontrada");
+    return;
+  }
+
+  player = doc.data();
+
   enterGame();
 }
+
 
 
 function autoLogin() {
@@ -513,13 +569,14 @@ function withdraw() {
   alert("🚧 Saque real será ativado com backend");
 }
 
-function logout() {
-  saveGame();
+async function logout() {
+  await firebase.auth().signOut();
+
   document.getElementById("gameBox").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
   document.getElementById("walletBox").classList.add("hidden");
-  player.username = "";
 }
+
 
 function startMiningAnimation() {
   document.getElementById("character").classList.add("mining");
@@ -531,4 +588,5 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
