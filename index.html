@@ -248,13 +248,12 @@ async function loadPlayerFromBackend() {
   const doc = await ref.get();
 
   if (doc.exists) {
-    player = doc.data();
-    multiplier = 1 + (player.upgrades.training * 0.05);
+  player = doc.data();
   } else {
-    // jogador novo
-    player.username = "";
-    await ref.set(player);
+  // ainda não cria nada
+    return;
   }
+
   applyOfflineMining();
   updateUI();
   updateWallet();
@@ -317,12 +316,15 @@ function saveGame() {
 /* =====================
    LOGIN
 ===================== */
-function login() {
+async function login() {
   const name = document.getElementById("username").value.trim();
   if (!name) return alert("Digite um nome");
-  applyOfflineMining();
+
   player.username = name;
-  saveGame();
+  player.lastActive = Date.now();
+
+  await db.collection("players").doc(currentUserId).set(player);
+
   enterGame();
 }
 
@@ -333,14 +335,18 @@ function autoLogin() {
 }
 
 function enterGame() {
+  applyOfflineMining(); // ✅ agora é seguro
+
   document.getElementById("walletBox").classList.remove("hidden");
   document.getElementById("playerName").innerText = player.username;
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("gameBox").classList.remove("hidden");
+
   startMiningAnimation();
   updateUI();
   updateWallet();
 }
+
 
 /* =====================
    OFFLINE MINING
@@ -521,6 +527,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
