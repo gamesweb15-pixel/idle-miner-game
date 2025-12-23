@@ -255,7 +255,7 @@ async function loadPlayerFromBackend() {
     player.username = "";
     await ref.set(player);
   }
-
+  applyOfflineMining();
   updateUI();
   updateWallet();
 }
@@ -293,33 +293,24 @@ let boostInterval = null;
 /* =====================
    LOAD
 ===================== */
-window.onload = () => {
-  const saved = localStorage.getItem("idlePlayer");
-  if (saved) {
-    player = JSON.parse(saved);
 
-    player.coins ??= 0;
-    player.rate ??= 0.025;
-    player.wallet ??= 0;
-    player.lastActive ??= Date.now();
-    player.lastAdTime ??= 0;
-    player.upgrades ??= { pickaxe:0, training:0, booster:0 };
-
-    // Recalcula multiplicador com base no treinamento
-    multiplier = 1 + (player.upgrades.training * 0.05);
-
-    applyOfflineMining();
-    autoLogin();
-  }
-};
 
 /* =====================
    SAVE
 ===================== */
+let saveTimeout = null;
+
 function saveGame() {
-  if (!currentUserId) return;
+  if (!currentUserId || !player.username) return;
+
   player.lastActive = Date.now();
-  db.collection("players").doc(currentUserId).set(player);
+
+  if (saveTimeout) return;
+
+  saveTimeout = setTimeout(() => {
+    db.collection("players").doc(currentUserId).set(player);
+    saveTimeout = null;
+  }, 2000);
 }
 
 
@@ -329,7 +320,7 @@ function saveGame() {
 function login() {
   const name = document.getElementById("username").value.trim();
   if (!name) return alert("Digite um nome");
-  applyOfflineMining()
+  
   player.username = name;
   saveGame();
   enterGame();
@@ -530,6 +521,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
