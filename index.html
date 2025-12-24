@@ -343,7 +343,9 @@ async function loadWithdrawHistory() {
     let html = "";
     snapshot.forEach(doc => {
       const w = doc.data();
-      const date = new Date(w.createdAt).toLocaleString("pt-BR");
+      const date = w.createdAt?.toDate
+      ? w.createdAt.toDate().toLocaleString("pt-BR")
+      : "Data pendente";
       const statusText =
         w.status === "paid" ? "✅ Pago" : "⏳ Pendente";
 
@@ -636,7 +638,7 @@ async function withdraw() {
       amountCoins: amountCoins,
       amountBRL: Number(amountBRL.toFixed(2)),
       status: "pending",
-      createdAt: Date.now()
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
     // remove da carteira (não some, vai pra fila)
@@ -671,6 +673,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
