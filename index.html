@@ -560,28 +560,36 @@ async function withdraw() {
   const MIN_WITHDRAW = 10;
 
   if (player.wallet < MIN_WITHDRAW) {
-    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+    alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
+    return;
   }
 
   const amountCoins = Math.floor(player.wallet);
-  const amountBRL = (amountCoins / COINS_PER_REAL).toFixed(2);
+  const amountBRL = amountCoins / COINS_PER_REAL;
 
-  await db.collection("withdraw_requests").add({
-    userId: currentUserId,
-    username: player.username,
-    pixKey: player.pixKey,
-    pixType: player.pixType,
-    amountCoins,
-    amountBRL: Number(amountBRL),
-    status: "pending",
-    createdAt: Date.now()
-  });
+  try {
+    // cria pedido de saque
+    await db.collection("withdraw_requests").add({
+      userId: currentUserId,
+      username: player.username,
+      pixKey: player.pixKey,
+      pixType: player.pixType,
+      amountCoins: amountCoins,
+      amountBRL: Number(amountBRL.toFixed(2)),
+      status: "pending",
+      createdAt: Date.now()
+    });
 
-  player.wallet -= amountCoins;
-  saveGame();
-  updateWallet();
+    // remove da carteira (não some, vai pra fila)
+    player.wallet -= amountCoins;
+    saveGame();
+    updateWallet();
 
-  alert("✅ Saque solicitado! Aguarde pagamento.");
+    alert("✅ Saque solicitado! Aguarde pagamento.");
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao solicitar saque");
+  }
 }
 
 
@@ -602,6 +610,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
