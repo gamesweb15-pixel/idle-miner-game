@@ -5,7 +5,6 @@
 <title>Idle Miner</title>
 
 <style>
-  
   body {
     margin: 0;
     font-family: Arial, sans-serif;
@@ -147,18 +146,6 @@ body {
   100% { transform: translateY(0); }
 }
 
-#withdrawHistoryBox {
-  background: rgba(0,0,0,0.4);
-  padding: 10px;
-  border-radius: 8px;
-  margin-top: 10px;
-  font-size: 14px;
-}
-
-.withdrawItem {
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  padding: 5px 0;
-}
 
 
 </style>
@@ -170,10 +157,6 @@ body {
   <div>Saldo: <span id="walletBalance">0.000</span> coins</div>
   <button onclick="withdraw()">💸 Sacar</button>
   <button onclick="openPixModal()">🏦 Cadastrar Pix</button>
-  <div id="withdrawHistoryBox">
-  <h3>📜 Histórico de Saques</h3>
-  <div id="withdrawHistoryList">Carregando...</div>
-</div>
 </div>
 
 
@@ -323,48 +306,6 @@ async function loadPlayerFromBackend() {
   updateWallet();
 }
 
-async function loadWithdrawHistory() {
-  const list = document.getElementById("withdrawHistoryList");
-  list.innerHTML = "Carregando...";
-
-  try {
-    const snapshot = await db
-      .collection("withdraw_requests")
-      .where("userId", "==", currentUserId)
-      .orderBy("createdAt", "desc")
-      .limit(10)
-      .get();
-
-    if (snapshot.empty) {
-      list.innerHTML = "<p>Nenhum saque encontrado.</p>";
-      return;
-    }
-
-    let html = "";
-    snapshot.forEach(doc => {
-      const w = doc.data();
-      const date = w.createdAt?.toDate
-      ? w.createdAt.toDate().toLocaleString("pt-BR")
-      : "Data pendente";
-      const statusText =
-        w.status === "paid" ? "✅ Pago" : "⏳ Pendente";
-
-      html += `
-        <div class="withdrawItem">
-          <span>${date}</span><br>
-          <strong>R$ ${w.amountBRL.toFixed(2)}</strong> – ${statusText}
-        </div>
-      `;
-    });
-
-    list.innerHTML = html;
-  } catch (err) {
-    console.error(err);
-    list.innerHTML = "Erro ao carregar histórico";
-  }
-}
-
-
 /* =====================
    CONFIGURAÇÕES GERAIS
 ===================== */
@@ -443,8 +384,6 @@ function autoLogin() {
 function enterGame() {
   if (!player.username) return;
   applyOfflineMining(); // ✅ agora é seguro
-  loadWithdrawHistory();
-
 
   document.getElementById("walletBox").classList.remove("hidden");
   document.getElementById("playerName").innerText = player.username;
@@ -621,38 +560,28 @@ async function withdraw() {
   const MIN_WITHDRAW = 10;
 
   if (player.wallet < MIN_WITHDRAW) {
-    alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
-    return;
+    return alert(`Saque mínimo: ${MIN_WITHDRAW} coins (R$1)`);
   }
 
   const amountCoins = Math.floor(player.wallet);
-  const amountBRL = amountCoins / COINS_PER_REAL;
+  const amountBRL = (amountCoins / COINS_PER_REAL).toFixed(2);
 
-  try {
-    // cria pedido de saque
-    await db.collection("withdraw_requests").add({
-      userId: currentUserId,
-      username: player.username,
-      pixKey: player.pixKey,
-      pixType: player.pixType,
-      amountCoins: amountCoins,
-      amountBRL: Number(amountBRL.toFixed(2)),
-      status: "pending",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+  await db.collection("withdraw_requests").add({
+    userId: currentUserId,
+    username: player.username,
+    pixKey: player.pixKey,
+    pixType: player.pixType,
+    amountCoins,
+    amountBRL: Number(amountBRL),
+    status: "pending",
+    createdAt: Date.now()
+  });
 
-    // remove da carteira (não some, vai pra fila)
-    player.wallet -= amountCoins;
-    saveGame();
-    updateWallet();
+  player.wallet -= amountCoins;
+  saveGame();
+  updateWallet();
 
-    alert("✅ Saque solicitado! Aguarde pagamento.");
-    loadWithdrawHistory();
-
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao solicitar saque");
-  }
+  alert("✅ Saque solicitado! Aguarde pagamento.");
 }
 
 
@@ -673,10 +602,6 @@ function startMiningAnimation() {
 
 </body>
 </html>
-
-
-
-
 
 
 
