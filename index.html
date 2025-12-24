@@ -432,21 +432,56 @@ setInterval(() => {
 /* =====================
    BOOSTER
 ===================== */
+function showRewardedAd(onReward) {
+  const adTime = 3000; // 3 segundos simulando anúncio
+
+  const adOverlay = document.createElement("div");
+  adOverlay.style.position = "fixed";
+  adOverlay.style.top = 0;
+  adOverlay.style.left = 0;
+  adOverlay.style.width = "100%";
+  adOverlay.style.height = "100%";
+  adOverlay.style.background = "rgba(0,0,0,0.85)";
+  adOverlay.style.color = "#fff";
+  adOverlay.style.display = "flex";
+  adOverlay.style.alignItems = "center";
+  adOverlay.style.justifyContent = "center";
+  adOverlay.style.fontSize = "22px";
+  adOverlay.style.zIndex = 9999;
+  adOverlay.innerText = "🎥 Assistindo anúncio...";
+
+  document.body.appendChild(adOverlay);
+
+  setTimeout(() => {
+    document.body.removeChild(adOverlay);
+    onReward();
+  }, adTime);
+}
+  
 function watchAd() {
   const now = Date.now();
   const elapsed = Math.floor((now - player.lastAdTime) / 1000);
 
   if (elapsed < AD_COOLDOWN) {
-    alert(`Aguarde ${AD_COOLDOWN - elapsed}s para novo anúncio`);
+    alert(`⏳ Aguarde ${AD_COOLDOWN - elapsed}s para novo anúncio`);
     return;
   }
 
-  if (boosterActive) return;
+  if (boosterActive) {
+    alert("⚡ Boost já está ativo");
+    return;
+  }
 
+  showRewardedAd(() => {
+    activateBoost();
+  });
+}
+
+function activateBoost() {
   boosterActive = true;
   multiplier *= 2;
   boostRemaining = BOOSTER_DURATION;
-  player.lastAdTime = now;
+  player.lastAdTime = Date.now();
 
   document.getElementById("character").classList.add("booster");
   document.getElementById("boostTimer").classList.remove("hidden");
@@ -456,7 +491,9 @@ function watchAd() {
     boostRemaining--;
     document.getElementById("boostTime").innerText = boostRemaining;
 
-    if (boostRemaining <= 0) endBooster();
+    if (boostRemaining <= 0) {
+      endBooster();
+    }
   }, 1000);
 
   saveGame();
@@ -602,6 +639,7 @@ function startMiningAnimation() {
 
 </body>
 </html>
+
 
 
 
